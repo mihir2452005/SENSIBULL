@@ -1,0 +1,52 @@
+/* tailwind-ignore */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --color-bg-primary: #0B1426;
+  --color-bg-secondary: #131B2F;
+  --color-accent-profit: #00C48C;
+  --color-accent-loss: #FF4D4F;
+  --color-text-primary: #FFFFFF;
+  --color-text-secondary: #8A92A6;
+  --color-border: #1F2A44;
+}
+
+body {
+  background-color: var(--color-bg-primary);
+  color: var(--color-text-primary);
+  font-family: 'Inter', sans-serif;
+  margin: 0;
+  -webkit-font-smoothing: antialiased;
+}
+
+.font-mono {
+  font-family: 'Roboto Mono', monospace;
+}
+
+/* Custom scrollbar for premium feel */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-bg-primary);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-secondary);
+}
+
+/* Glassmorphism utility */
+.glass {
+  background: rgba(19, 27, 47, 0.7);
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--color-border);
+}
