@@ -49,3 +49,13 @@ body {
   backdrop-filter: blur(8px);
   border: 1px solid var(--color-border);
 }
+
+/* L-03: Loading bar keyframe animation */
+@keyframes loading {
+  from { width: 0%; }
+  to { width: 100%; }
+}
+
+.loading-bar {
+  animation: loading 1.2s ease-in-out forwards;
+}

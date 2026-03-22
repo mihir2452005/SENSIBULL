@@ -5,7 +5,7 @@ export const Login = ({ onLogin }) => {
   const [step, setStep] = useState('input'); // 'input' or 'otp'
   const [identifier, setIdentifier] = useState('');
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
-  const [timer, setTimer] = useState(60);
+  const [timer, setTimer] = useState(0); // H-06 fix: starts at 0, not 60
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -22,7 +22,7 @@ export const Login = ({ onLogin }) => {
     const isPhone = /^\d{10}$/.test(identifier);
     if (isEmail || isPhone) {
       setStep('otp');
-      setTimer(60);
+      setTimer(60); // Start countdown only when OTP is actually sent
       setError('');
     } else {
       setError('Please enter a valid email or 10-digit mobile number');
@@ -153,7 +153,7 @@ export const Login = ({ onLogin }) => {
             
             <button 
               type="button"
-              onClick={() => setStep('input')}
+              onClick={() => { setStep('input'); setTimer(0); }}
               className="w-full text-center text-xs text-[#8A92A6] hover:text-white transition-colors"
             >
               Change Mobile/Email

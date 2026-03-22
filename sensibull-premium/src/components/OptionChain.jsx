@@ -118,6 +118,9 @@ const OptionChainRow = ({ data, spot, onSelectLeg, viewMode, atmRef }) => {
 export const OptionChain = ({ symbol = 'NIFTY', spot = 23450, onAddLeg }) => {
   const [viewMode, setViewMode] = useState('LTP');
   const [selectedLeg, setSelectedLeg] = useState(null);
+  const [selectedExpiry, setSelectedExpiry] = useState('27 MAR 2026');
+  const [showExpiryMenu, setShowExpiryMenu] = useState(false);
+  const EXPIRY_OPTIONS = ['27 MAR 2026', '3 APR 2026', '24 APR 2026'];
   const scrollContainerRef = useRef(null);
   const atmRowRef = useRef(null);
 
@@ -144,12 +147,28 @@ export const OptionChain = ({ symbol = 'NIFTY', spot = 23450, onAddLeg }) => {
     <div className="bg-[#131B2F]/30 rounded-2xl border border-[#1F2A44] overflow-hidden flex flex-col h-[700px]">
       <div className="flex items-center justify-between p-4 border-b border-[#1F2A44]">
         <div className="flex items-center gap-4">
-          <div className="flex flex-col">
+          <div className="flex flex-col relative">
             <span className="text-[10px] text-[#8A92A6] uppercase font-bold tracking-widest">Expiry Date</span>
-            <div className="flex items-center gap-2 text-sm font-bold text-white cursor-pointer hover:text-[#00C48C]">
-              27 MAR 2026
+            <div 
+              className="flex items-center gap-2 text-sm font-bold text-white cursor-pointer hover:text-[#00C48C]"
+              onClick={() => setShowExpiryMenu(v => !v)}
+            >
+              {selectedExpiry}
               <div className="w-4 h-4 rounded bg-[#1F2A44] flex items-center justify-center text-[8px]">▼</div>
             </div>
+            {showExpiryMenu && (
+              <div className="absolute top-12 left-0 z-50 bg-[#131B2F] border border-[#1F2A44] rounded-xl shadow-2xl overflow-hidden">
+                {EXPIRY_OPTIONS.map(exp => (
+                  <button
+                    key={exp}
+                    onClick={() => { setSelectedExpiry(exp); setShowExpiryMenu(false); }}
+                    className={`w-full px-4 py-2 text-left text-sm hover:bg-[#1F2A44] transition-colors ${
+                      exp === selectedExpiry ? 'text-[#00C48C] font-bold' : 'text-white'
+                    }`}
+                  >{exp}</button>
+                ))}
+              </div>
+            )}
           </div>
         </div>
         
@@ -194,9 +213,9 @@ export const OptionChain = ({ symbol = 'NIFTY', spot = 23450, onAddLeg }) => {
         <TradeModal 
           isOpen={!!selectedLeg}
           onClose={() => setSelectedLeg(null)}
-          data={selectedLeg}
+          data={{...selectedLeg, expiry: selectedExpiry}}
           onConfirm={(leg) => {
-            onAddLeg(leg);
+            onAddLeg({...leg, expiry: selectedExpiry});
             setSelectedLeg(null);
           }}
         />

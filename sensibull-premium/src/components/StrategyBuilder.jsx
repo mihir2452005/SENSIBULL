@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Trash2, Plus, Copy, Info, Layers } from 'lucide-react';
 import { PayoffChart } from './PayoffChart';
 
@@ -24,23 +24,55 @@ const getIV = (leg) => {
 };
 
 export const StrategyBuilder = ({ legs = [], onAddLeg, onRemoveLeg, onUpdateLeg, onPlaceOrder, spot = 23450 }) => {
+  // M-05: Track whether to show EXPIRY or T+0 payoff
+  const [payoffView, setPayoffView] = useState('expiry');
   const { maxProfit, maxLoss, netPremium, probOfProfit } = useMemo(() => {
     let netPremium = 0;
     let netDelta = 0;
     legs.forEach(leg => {
       const prem = leg.ltp * leg.qty * 50;
       netPremium += leg.action === 'BUY' ? -prem : prem;
-      // Approximate delta: ATM ≈ 0.5, scale by moneyness
       const approxDelta = 0.5 + (spot - leg.strike) / (spot * 0.1);
       const clampedDelta = Math.max(0.05, Math.min(0.95, approxDelta));
       netDelta += leg.action === 'BUY' ? clampedDelta * leg.qty : -clampedDelta * leg.qty;
     });
-    const isCredit = netPremium > 0;
-    const maxProfit = isCredit ? netPremium : 'Unlimited';
-    const maxLoss = isCredit ? 'Limited' : Math.abs(netPremium);
-    // Prob of profit: for credit strategies ~ premium / (premium + maxLoss). For debit, use delta.
-    const probOfProfit = legs.length === 0 
-      ? 0 
+
+    // H-04: Derive max profit/loss by scanning payoff curve (handles spreads correctly)
+    const range = 1500;
+    const points = 60;
+    let maxP = -Infinity;
+    let maxL = Infinity;
+    for (let i = -points; i <= points; i++) {
+      const underlying = spot + (i * range) / points;
+      let pnl = 0;
+      legs.forEach(leg => {
+        const intrinsic = leg.type === 'CE'
+          ? Math.max(0, underlying - leg.strike)
+          : Math.max(0, leg.strike - underlying);
+        const unitPnl = leg.action === 'BUY' ? intrinsic - leg.ltp : leg.ltp - intrinsic;
+        pnl += unitPnl * leg.qty * 50;
+      });
+      if (pnl > maxP) maxP = pnl;
+      if (pnl < maxL) maxL = pnl;
+    }
+    // Still show 'Unlimited' if payoff keeps growing past scan range
+    const pyoffAtEdgeHigh = (() => {
+      const underlying = spot + range * 1.2;
+      let pnl = 0;
+      legs.forEach(leg => {
+        const intrinsic = leg.type === 'CE' ? Math.max(0, underlying - leg.strike) : Math.max(0, leg.strike - underlying);
+        const unitPnl = leg.action === 'BUY' ? intrinsic - leg.ltp : leg.ltp - intrinsic;
+        pnl += unitPnl * leg.qty * 50;
+      });
+      return pnl;
+    })();
+    const isUnlimitedProfit = pyoffAtEdgeHigh > maxP * 0.95 && maxP > 0;
+    const isUnlimitedLoss = -pyoffAtEdgeHigh > Math.abs(maxL) * 0.95 && maxL < 0;
+
+    const maxProfit = legs.length === 0 ? 'N/A' : isUnlimitedProfit ? 'Unlimited' : maxP;
+    const maxLoss = legs.length === 0 ? 'N/A' : isUnlimitedLoss ? 'Unlimited' : Math.abs(maxL);
+    const probOfProfit = legs.length === 0
+      ? 0
       : Math.max(20, Math.min(95, 50 + netDelta * 10)).toFixed(1);
     return { maxProfit, maxLoss, netPremium, probOfProfit };
   }, [legs, spot]);
@@ -138,19 +170,19 @@ export const StrategyBuilder = ({ legs = [], onAddLeg, onRemoveLeg, onUpdateLeg,
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <MetricCard 
             label="Max Profit" 
-            value={typeof maxProfit === 'number' ? `₹${maxProfit.toLocaleString('en-IN')}` : maxProfit} 
+            value={typeof maxProfit === 'number' ? `₹${maxProfit.toLocaleString('en-IN', { maximumFractionDigits: 0 })}` : maxProfit} 
             sub="Estimated at expiry"
             type="profit"
           />
           <MetricCard 
             label="Max Loss" 
-            value={typeof maxLoss === 'number' ? `₹${maxLoss.toLocaleString('en-IN')}` : maxLoss} 
+            value={typeof maxLoss === 'number' ? `₹${maxLoss.toLocaleString('en-IN', { maximumFractionDigits: 0 })}` : maxLoss} 
             sub="Estimated at expiry"
             type="loss"
           />
           <MetricCard 
             label="Net Premium" 
-            value={`₹${Math.abs(netPremium).toLocaleString('en-IN')}`} 
+            value={`₹${Math.abs(netPremium).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`} 
             sub={netPremium >= 0 ? 'Credit Received' : 'Debit Paid'}
             type={netPremium >= 0 ? 'profit' : 'loss'}
           />
@@ -165,7 +197,6 @@ export const StrategyBuilder = ({ legs = [], onAddLeg, onRemoveLeg, onUpdateLeg,
           <div className="flex items-center justify-between mb-8">
             <h3 className="font-bold text-sm">Payoff Visualization</h3>
             <div className="flex gap-4 items-center">
-              {/* FIX BUG: Disable Place Order when no legs present */}
               <button 
                 onClick={onPlaceOrder}
                 disabled={legs.length === 0}
@@ -173,14 +204,25 @@ export const StrategyBuilder = ({ legs = [], onAddLeg, onRemoveLeg, onUpdateLeg,
               >
                 Place Order
               </button>
+              {/* M-05: Wired toggle buttons for Expiry vs T+0 payoff view */}
               <div className="flex gap-2 p-1 bg-[#0B1426] rounded-lg">
-                 <button className="px-3 py-1 bg-[#1F2A44] text-white text-[10px] font-bold rounded">EXPIRY</button>
-                 <button className="px-3 py-1 text-[#8A92A6] text-[10px] font-bold rounded">T+0</button>
+                 <button 
+                   onClick={() => setPayoffView('expiry')}
+                   className={`px-3 py-1 text-[10px] font-bold rounded transition-all ${
+                     payoffView === 'expiry' ? 'bg-[#1F2A44] text-white' : 'text-[#8A92A6] hover:text-white'
+                   }`}
+                 >EXPIRY</button>
+                 <button 
+                   onClick={() => setPayoffView('t0')}
+                   className={`px-3 py-1 text-[10px] font-bold rounded transition-all ${
+                     payoffView === 't0' ? 'bg-[#1F2A44] text-white' : 'text-[#8A92A6] hover:text-white'
+                   }`}
+                 >T+0</button>
               </div>
             </div>
           </div>
           <div className="flex-1 w-full bg-[#0B1426]/30 rounded-xl overflow-hidden">
-             <PayoffChart legs={legs} spot={spot} />
+             <PayoffChart legs={legs} spot={spot} viewMode={payoffView} />
           </div>
         </div>
       </div>

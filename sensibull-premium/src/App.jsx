@@ -157,10 +157,9 @@ const Header = ({ niftySpot, bankNiftySpot, niftyChange, niftyPct, bankNiftyChan
   );
 };
 
-// FIX BUG-3: Settings panel component
-const SettingsPanel = () => {
+// M-03 fixed: SettingsPanel accepts realTimeFeed from App so toggling actually pauses the sim
+const SettingsPanel = ({ realTimeFeed, setRealTimeFeed }) => {
   const [paperTrading, setPaperTrading] = useState(true);
-  const [realTimeFeed, setRealTimeFeed] = useState(true);
   const [darkMode, setDarkMode] = useState(true);
 
   return (
@@ -235,6 +234,8 @@ function App() {
   const [niftySpot, setNiftySpot] = useState(NIFTY_OPEN);
   const [bankNiftySpot, setBankNiftySpot] = useState(BANK_NIFTY_OPEN);
   const [finniftySpot, setFinniftySpot] = useState(21500.00);
+  // M-03: realTimeFeed lifted from SettingsPanel into App so the sim interval can be gated
+  const [realTimeFeed, setRealTimeFeed] = useState(true);
   const [legs, setLegs] = useState([
     { strike: 23500, type: 'CE', action: 'BUY', qty: 1, ltp: 145.20 },
     { strike: 23600, type: 'CE', action: 'SELL', qty: 1, ltp: 88.40 }
@@ -251,18 +252,24 @@ function App() {
     }
   ]);
   const [realizedPnl, setRealizedPnl] = useState(0);
+  const [exitedPositions, setExitedPositions] = useState([]);
+
 
   // Compute the active spot based on index selection
   const activeSpot = selectedIndex === 'NIFTY' ? niftySpot : selectedIndex === 'BANKNIFTY' ? bankNiftySpot : finniftySpot;
 
-  // Derive market open/closed from real time (NSE: Mon-Fri 9:15am - 3:30pm IST)
-  const isMarketOpen = (() => {
+  // H-01: Recompute isMarketOpen every minute (not just once at render)
+  const computeMarketOpen = () => {
     const now = new Date();
-    const day = now.getDay(); // 0=Sun,6=Sat
-    const h = now.getHours(), m = now.getMinutes();
-    const mins = h * 60 + m;
-    return day >= 1 && day <= 5 && mins >= 555 && mins < 930; // 9:15=555, 15:30=930
-  })();
+    const day = now.getDay();
+    const mins = now.getHours() * 60 + now.getMinutes();
+    return day >= 1 && day <= 5 && mins >= 555 && mins < 930;
+  };
+  const [isMarketOpen, setIsMarketOpen] = useState(computeMarketOpen);
+  useEffect(() => {
+    const interval = setInterval(() => setIsMarketOpen(computeMarketOpen()), 60000);
+    return () => clearInterval(interval);
+  }, []);
 
   // FIX BUG-4: Track live change from open price
   const niftyChange = niftySpot - NIFTY_OPEN;
@@ -285,15 +292,16 @@ function App() {
     setActiveTab('positions');
   };
 
-  // Simulate market movement for all 3 indices
+  // C-01: Pause market simulation when market is closed OR real-time feed is toggled off
   useEffect(() => {
+    if (!isMarketOpen || !realTimeFeed) return; // Gate: no movement after hours
     const interval = setInterval(() => {
       setNiftySpot(prev => +(prev + (Math.random() - 0.5) * 8).toFixed(2));
       setBankNiftySpot(prev => +(prev + (Math.random() - 0.5) * 15).toFixed(2));
       setFinniftySpot(prev => +(prev + (Math.random() - 0.5) * 6).toFixed(2));
     }, 1000);
     return () => clearInterval(interval);
-  }, []);
+  }, [isMarketOpen, realTimeFeed]);
 
   const addLeg = (leg) => {
     setLegs(prev => [...prev, leg]);
@@ -327,19 +335,22 @@ function App() {
     setPositions(prev => {
       const posToExit = prev[index];
       setRealizedPnl(r => r + posToExit.pnl);
+      // M-04: Save snapshot to history
+      setExitedPositions(hist => [...hist, { ...posToExit }]);
       return prev.filter((_, i) => i !== index);
     });
   };
 
-  // FIX BUG-2: Correct real-time P&L formula — SELL positions correctly lose value when LTP rises
+  // C-02: Gate P&L position updates — no LTP movement when market is closed
   useEffect(() => {
+    if (!isMarketOpen || !realTimeFeed) return;
     setPositions(prev => prev.map(pos => {
-      const delta = (Math.random() - 0.5) * 2; // Random ±1 tick per second
+      const delta = (Math.random() - 0.5) * 2;
       const newLtp = Math.max(0.05, +(pos.ltp + delta).toFixed(2));
       const newPnl = +((newLtp - pos.avgPrice) * pos.qty * 50).toFixed(2);
       return { ...pos, ltp: newLtp, pnl: newPnl };
     }));
-  }, [niftySpot]); // Re-run on every market tick
+  }, [niftySpot]); // niftySpot only changes when sim is running (gated above)
 
   if (loading) {
     return (
@@ -348,7 +359,7 @@ function App() {
           <Zap size={32} className="text-[#0B1426] fill-current" />
         </div>
         <div className="w-48 h-1.5 bg-[#1F2A44] rounded-full overflow-hidden">
-          <div className="h-full bg-[#00C48C] animate-[loading_1.2s_ease-in-out_forwards]" style={{ animation: 'loading 1.2s ease-in-out forwards', width: '0%' }} />
+          <div className="h-full bg-[#00C48C] loading-bar" />
         </div>
         <span className="text-[#8A92A6] text-xs font-mono mt-4 tracking-widest uppercase">Initializing Sensibull Pro...</span>
       </div>
@@ -365,7 +376,7 @@ function App() {
   return (
     <div className="min-h-screen bg-[#0B1426] text-white">
       <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
-      {/* FIX BUG-4: Pass live change values to Header */}
+      {/* H-02: isMarketOpen prop passed so Header badge reflects real status */}
       <Header 
         niftySpot={niftySpot} 
         bankNiftySpot={bankNiftySpot}
@@ -373,7 +384,8 @@ function App() {
         niftyPct={niftyPct}
         bankNiftyChange={bankNiftyChange}
         bankNiftyPct={bankNiftyPct}
-        onLogout={handleLogout} 
+        onLogout={handleLogout}
+        isMarketOpen={isMarketOpen}
       />
       
       <main className="pl-64 pt-20">
@@ -418,7 +430,7 @@ function App() {
                 onUpdateLeg={updateLeg}
                 onAddLeg={() => setActiveTab('chain')} 
                 onPlaceOrder={placeOrder}
-                spot={niftySpot} 
+                spot={activeSpot}
               />
             </>
           )}
@@ -431,7 +443,7 @@ function App() {
                   <p className="text-[#8A92A6]">Track your simulated P&L and active trades</p>
                 </div>
               </div>
-              <Portfolio positions={positions} onExitPosition={handleExitPosition} realizedPnl={realizedPnl} />
+              <Portfolio positions={positions} onExitPosition={handleExitPosition} realizedPnl={realizedPnl} exitedPositions={exitedPositions} />
              </>
           )}
 
@@ -444,7 +456,8 @@ function App() {
                   <p className="text-[#8A92A6]">Manage your preferences and account</p>
                 </div>
               </div>
-              <SettingsPanel />
+              {/* M-03: Pass realTimeFeed state down so toggle actually connects to the sim */}
+              <SettingsPanel realTimeFeed={realTimeFeed} setRealTimeFeed={setRealTimeFeed} />
             </>
           )}
         </div>

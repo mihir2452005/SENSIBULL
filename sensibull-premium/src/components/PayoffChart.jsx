@@ -10,7 +10,7 @@ import {
   ReferenceLine
 } from 'recharts';
 
-export const PayoffChart = ({ legs = [], spot = 23450, step = 50 }) => {
+export const PayoffChart = ({ legs = [], spot = 23450, step = 50, viewMode = 'expiry' }) => {
   // FIX BUG: Memoize so P&L data only recalculates when legs or spot changes
   const data = useMemo(() => {
     const range = 500;
@@ -23,14 +23,17 @@ export const PayoffChart = ({ legs = [], spot = 23450, step = 50 }) => {
         const intrinsic = leg.type === 'CE'
           ? Math.max(0, underlying - leg.strike)
           : Math.max(0, leg.strike - underlying);
+        // M-05: For T+0 view, add a rough time-value approximation (min of 30% of premium stays as TV)
+        const timeValue = viewMode === 't0' ? leg.ltp * 0.35 * Math.exp(-Math.abs(underlying - leg.strike) / (spot * 0.05)) : 0;
+        const effectiveValue = intrinsic + timeValue;
         const unitPnl = leg.action === 'BUY'
-          ? intrinsic - leg.ltp
-          : leg.ltp - intrinsic;
+          ? effectiveValue - leg.ltp
+          : leg.ltp - effectiveValue;
         pnl += unitPnl * leg.qty * 50;
       });
-      return { underlying, pnl: Math.round(pnl) };
+      return { underlying, pnl: +pnl.toFixed(2) }; // L-01: 2dp precision
     });
-  }, [legs, spot]);
+  }, [legs, spot, viewMode]);
 
   const CustomTooltip = ({ active, payload }) => {
     if (active && payload && payload.length) {

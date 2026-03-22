@@ -64,7 +64,11 @@ export const calculateGreeks = (S, K, T, r, sigma, type = 'CE') => {
   };
 };
 
-export const generateOptionChain = (spot, step = 50, range = 20, dte = 7) => {
+export const generateOptionChain = (spot, step = 50, range = 20) => {
+  // H-07: Compute DTE from real expiry date instead of hardcoded 7
+  const EXPIRY_DATE = new Date('2026-03-27T15:30:00+05:30');
+  const now = new Date();
+  const dte = Math.max(0.5, (EXPIRY_DATE - now) / (1000 * 60 * 60 * 24));
   const T = dte / 365;
   const r = 0.07;
   const atmBase = Math.round(spot / step) * step;
@@ -82,15 +86,17 @@ export const generateOptionChain = (spot, step = 50, range = 20, dte = 7) => {
       strike,
       ce: {
         ltp: ce.price,
-        change: +((strike % 73) / 10 - 4).toFixed(2), // deterministic change per strike
-        oi: Math.floor(1000000 * Math.exp(-15 * dist)),
+        change: +((strike % 73) / 10 - 4).toFixed(2),
+        // L-02: OI with slight skew (PCR ~1.15 near ATM, lower far OTM)
+        oi: Math.floor(1000000 * Math.exp(-15 * dist) * (1 + dist * 0.1)),
         iv: iv,
         ...ce
       },
       pe: {
         ltp: pe.price,
-        change: +((strike % 61) / 10 - 3).toFixed(2), // deterministic change per strike
-        oi: Math.floor(1000000 * Math.exp(-15 * dist)),
+        change: +((strike % 61) / 10 - 3).toFixed(2),
+        // L-02: PE OI slightly higher than CE (reflects typical put-call ratio > 1)
+        oi: Math.floor(1000000 * Math.exp(-15 * dist) * 1.15 * (1 - dist * 0.05)),
         iv: iv,
         ...pe
       }

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { 
   Briefcase, 
   ArrowUpRight, 
@@ -6,7 +6,7 @@ import {
   Download
 } from 'lucide-react';
 
-const PositionRow = ({ symbol, strike, type, qty, avgPrice, ltp, pnl, onExit }) => {
+const PositionRow = ({ symbol, strike, type, qty, avgPrice, ltp, pnl, onExit, expiry }) => {
   // FIX BUG: Guard against divide-by-zero when qty is 0 or avgPrice is 0
   const pctPnl = avgPrice > 0 && Math.abs(qty) > 0
     ? ((pnl / (avgPrice * Math.abs(qty) * 50)) * 100).toFixed(2)
@@ -17,7 +17,8 @@ const PositionRow = ({ symbol, strike, type, qty, avgPrice, ltp, pnl, onExit }) 
     <td className="py-4 pl-4">
       <div className="flex flex-col">
         <span className="text-sm font-bold text-white">{symbol}</span>
-        <span className="text-[10px] text-[#8A92A6] uppercase font-bold tracking-wider">27 MAR EXP</span>
+        {/* M-02: Show actual expiry from position object */}
+        <span className="text-[10px] text-[#8A92A6] uppercase font-bold tracking-wider">{expiry ? expiry.replace('20', '') : '27 MAR 2026'} EXP</span>
       </div>
     </td>
     <td className="py-4">
@@ -36,7 +37,7 @@ const PositionRow = ({ symbol, strike, type, qty, avgPrice, ltp, pnl, onExit }) 
     <td className="py-4 text-center font-mono text-xs">₹{ltp.toFixed(2)}</td>
     <td className="py-4 text-right">
       <div className={`flex flex-col items-end ${pnl >= 0 ? 'text-[#00C48C]' : 'text-[#FF4D4F]'}`}>
-        <span className="text-xs font-bold font-mono">₹{pnl.toLocaleString('en-IN')}</span>
+        <span className="text-xs font-bold font-mono">₹{pnl.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
         <span className="text-[9px] font-bold">
           {pnl >= 0 ? '+' : ''}{pctPnl}%
         </span>
@@ -54,7 +55,9 @@ const PositionRow = ({ symbol, strike, type, qty, avgPrice, ltp, pnl, onExit }) 
   );
 };
 
-export const Portfolio = ({ positions = [], onExitPosition, realizedPnl = 0 }) => {
+export const Portfolio = ({ positions = [], onExitPosition, realizedPnl = 0, exitedPositions = [] }) => {
+  // M-04: which tab to show
+  const [activeTab, setActiveTab] = useState('current');
   const totalPnl = positions.reduce((acc, pos) => acc + pos.pnl, 0);
 
   // Calculate margin utilized by active positions
@@ -67,6 +70,18 @@ export const Portfolio = ({ positions = [], onExitPosition, realizedPnl = 0 }) =
   const initialFunds = 600000;
   const availableFunds = initialFunds - marginUsed + realizedPnl;
   const totalNetPnl = totalPnl + realizedPnl;
+
+  // M-04: CSV Export for Download button
+  const handleDownload = () => {
+    const header = 'Symbol,Strike,Type,Qty,Avg Price,LTP,P&L\n';
+    const rows = positions.map(p =>
+      `${p.symbol},${p.strike},${p.type},${Math.abs(p.qty) * 50},${p.avgPrice.toFixed(2)},${p.ltp.toFixed(2)},${p.pnl.toFixed(2)}`
+    ).join('\n');
+    const blob = new Blob([header + rows], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = 'positions.csv'; a.click();
+    URL.revokeObjectURL(url);
+  };
 
   return (
     <div className="flex flex-col gap-6">
@@ -111,14 +126,24 @@ export const Portfolio = ({ positions = [], onExitPosition, realizedPnl = 0 }) =
             <h3 className="font-bold text-sm">Active Positions</h3>
             <div className="h-4 w-px bg-[#1F2A44]" />
             <div className="flex gap-2">
-               <button className="px-3 py-1 bg-[#00C48C]/10 text-[#00C48C] text-[10px] font-bold rounded-lg border border-[#00C48C]/20">CURRENT ({positions.length})</button>
-               <button className="px-3 py-1 text-[#8A92A6] text-[10px] font-bold rounded-lg hover:text-white">HISTORY</button>
+               <button
+                 onClick={() => setActiveTab('current')}
+                 className={`px-3 py-1 text-[10px] font-bold rounded-lg border transition-all ${
+                   activeTab === 'current' ? 'bg-[#00C48C]/10 text-[#00C48C] border-[#00C48C]/20' : 'border-transparent text-[#8A92A6] hover:text-white'
+                 }`}
+               >CURRENT ({positions.length})</button>
+               <button
+                 onClick={() => setActiveTab('history')}
+                 className={`px-3 py-1 text-[10px] font-bold rounded-lg border transition-all ${
+                   activeTab === 'history' ? 'bg-[#00C48C]/10 text-[#00C48C] border-[#00C48C]/20' : 'border-transparent text-[#8A92A6] hover:text-white'
+                 }`}
+               >HISTORY ({exitedPositions.length})</button>
             </div>
           </div>
           
           <div className="flex items-center gap-3">
              <button className="p-2 text-[#8A92A6] hover:text-white transition-colors bg-[#1F2A44]/50 rounded-lg"><Filter size={14} /></button>
-             <button className="p-2 text-[#8A92A6] hover:text-white transition-colors bg-[#1F2A44]/50 rounded-lg"><Download size={14} /></button>
+             <button onClick={handleDownload} title="Export CSV" className="p-2 text-[#8A92A6] hover:text-[#00C48C] transition-colors bg-[#1F2A44]/50 rounded-lg"><Download size={14} /></button>
           </div>
         </div>
 
@@ -130,28 +155,50 @@ export const Portfolio = ({ positions = [], onExitPosition, realizedPnl = 0 }) =
                 <th className="py-3">Option</th>
                 <th className="py-3 text-center">Qty</th>
                 <th className="py-3 text-center">Avg. Price</th>
-                <th className="py-3 text-center">LTP</th>
-                <th className="py-3 text-right">Unrealized P&L</th>
-                <th className="py-3 text-right pr-4">Action</th>
+                <th className="py-3 text-center">{activeTab === 'current' ? 'LTP' : 'Exit Price'}</th>
+                <th className="py-3 text-right">{activeTab === 'current' ? 'Unrealized P&L' : 'Realized P&L'}</th>
+                <th className="py-3 text-right pr-4">{activeTab === 'current' ? 'Action' : 'Status'}</th>
               </tr>
             </thead>
             <tbody>
-              {positions.length === 0 ? (
-                <tr>
-                   <td colSpan={7} className="py-24 text-center">
-                      <Briefcase size={48} className="text-[#1F2A44] mx-auto mb-4" />
-                      <p className="text-[#8A92A6] text-sm font-medium">No active positions found.</p>
-                      <p className="text-[10px] text-[#2d4a66] mt-1">Start trading from the Option Chain to see positions here.</p>
-                   </td>
-                </tr>
+              {activeTab === 'current' ? (
+                positions.length === 0 ? (
+                  <tr><td colSpan={7} className="py-24 text-center">
+                    <Briefcase size={48} className="text-[#1F2A44] mx-auto mb-4" />
+                    <p className="text-[#8A92A6] text-sm font-medium">No active positions found.</p>
+                    <p className="text-[10px] text-[#2d4a66] mt-1">Start trading from the Option Chain to see positions here.</p>
+                  </td></tr>
+                ) : (
+                  positions.map((pos, idx) => (
+                    <PositionRow key={idx} {...pos} onExit={() => onExitPosition(idx)} />
+                  ))
+                )
               ) : (
-                positions.map((pos, idx) => (
-                  <PositionRow 
-                    key={idx} 
-                    {...pos} 
-                    onExit={() => onExitPosition(idx)} 
-                  />
-                ))
+                exitedPositions.length === 0 ? (
+                  <tr><td colSpan={7} className="py-24 text-center">
+                    <Briefcase size={48} className="text-[#1F2A44] mx-auto mb-4" />
+                    <p className="text-[#8A92A6] text-sm font-medium">No trade history yet.</p>
+                    <p className="text-[10px] text-[#2d4a66] mt-1">Exit a position to see it here.</p>
+                  </td></tr>
+                ) : (
+                  exitedPositions.map((pos, idx) => (
+                    <tr key={idx} className="border-b border-[#1F2A44]/30 hover:bg-[#1F2A44]/20">
+                      <td className="py-4 pl-4"><div className="flex flex-col">
+                        <span className="text-sm font-bold text-white">{pos.symbol}</span>
+                        <span className="text-[10px] text-[#8A92A6] uppercase font-bold">{pos.expiry || '27 MAR 2026'} EXP</span>
+                      </div></td>
+                      <td className="py-4"><div className="flex items-center gap-2">
+                        <span className="text-xs font-bold font-mono">{pos.strike}</span>
+                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${pos.type === 'CE' ? 'bg-[#00C48C]/10 text-[#00C48C]' : 'bg-[#FF4D4F]/10 text-[#FF4D4F]'}`}>{pos.type}</span>
+                      </div></td>
+                      <td className="py-4 text-center font-mono text-xs">{Math.abs(pos.qty) * 50}</td>
+                      <td className="py-4 text-center font-mono text-xs text-[#8A92A6]">₹{pos.avgPrice.toFixed(2)}</td>
+                      <td className="py-4 text-center font-mono text-xs text-[#8A92A6]">₹{pos.ltp.toFixed(2)}</td>
+                      <td className={`py-4 text-right font-mono text-xs font-bold ${pos.pnl >= 0 ? 'text-[#00C48C]' : 'text-[#FF4D4F]'}`}>{pos.pnl >= 0 ? '+' : ''}₹{pos.pnl.toFixed(2)}</td>
+                      <td className="py-4 text-right pr-4"><span className="text-[10px] text-[#8A92A6] font-bold uppercase">Exited</span></td>
+                    </tr>
+                  ))
+                )
               )}
             </tbody>
           </table>
