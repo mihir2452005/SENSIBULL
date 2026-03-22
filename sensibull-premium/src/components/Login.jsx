@@ -117,6 +117,17 @@ export const Login = ({ onLogin }) => {
                       document.getElementById(`otp-${idx - 1}`).focus();
                     }
                   }}
+                  onPaste={(e) => {
+                    // M-12: Paste handler — auto-fill all 6 digits from clipboard
+                    e.preventDefault();
+                    const pasted = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6);
+                    if (pasted.length > 0) {
+                      const newOtp = [...otp];
+                      pasted.split('').forEach((ch, i) => { newOtp[i] = ch; });
+                      setOtp(newOtp);
+                      document.getElementById(`otp-${Math.min(pasted.length - 1, 5)}`)?.focus();
+                    }
+                  }}
                 />
               ))}
             </div>
@@ -142,7 +153,9 @@ export const Login = ({ onLogin }) => {
                   disabled={timer > 0}
                   onClick={() => {
                     setTimer(60);
+                    setOtp(['', '', '', '', '', '']); // H-04: clear OTP boxes on resend
                     setError('');
+                    document.getElementById('otp-0')?.focus();
                   }}
                   className="text-[10px] text-[#00C48C] font-bold uppercase tracking-widest hover:underline disabled:text-[#1F2A44]"
                 >

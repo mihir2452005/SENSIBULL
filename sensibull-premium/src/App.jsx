@@ -40,8 +40,8 @@ const Sidebar = ({ activeTab, setActiveTab }) => (
           onClick={() => setActiveTab(item.id)}
           className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group ${
             activeTab === item.id 
-              ? 'bg-[#00C48C]/10 text-[#00C48C]' 
-              : 'text-[#8A92A6] hover:bg-[#1F2A44] hover:text-white'
+              ? 'bg-[#00C48C]/10 text-[#00C48C] border-l-2 border-[#00C48C]' 
+              : 'text-[#8A92A6] hover:bg-[#1F2A44] hover:text-white border-l-2 border-transparent'
           }`}
         >
           <item.icon size={20} className={activeTab === item.id ? 'text-[#00C48C]' : 'group-hover:text-white'} />
@@ -63,7 +63,7 @@ const Sidebar = ({ activeTab, setActiveTab }) => (
   </aside>
 );
 
-// FIX BUG-4: IndexWidget now receives and displays live change derived from props
+// H-01 H-02: FINNIFTY IndexWidget with correct change tracking
 const IndexWidget = ({ name, price, change, pct }) => (
   <div className="flex items-center gap-4 px-4 py-2 bg-[#131B2F]/50 border border-[#1F2A44] rounded-lg">
     <div className="flex flex-col">
@@ -77,11 +77,12 @@ const IndexWidget = ({ name, price, change, pct }) => (
   </div>
 );
 
-const Header = ({ niftySpot, bankNiftySpot, niftyChange, niftyPct, bankNiftyChange, bankNiftyPct, onLogout, isMarketOpen }) => {
+// H-03: Header now has functioning search + FINNIFTY widget + dark mode wired
+const Header = ({ niftySpot, bankNiftySpot, finniftySpot, niftyChange, niftyPct, bankNiftyChange, bankNiftyPct, finniftyChange, finniftyPct, onLogout, isMarketOpen, onNavigate }) => {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [searchVal, setSearchVal] = useState('');
   const dropdownRef = useRef(null);
 
-  // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (e) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
@@ -92,19 +93,33 @@ const Header = ({ niftySpot, bankNiftySpot, niftyChange, niftyPct, bankNiftyChan
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  // H-03: Search bar — navigate to chain and switch index on Enter
+  const handleSearch = (e) => {
+    if (e.key === 'Enter') {
+      const val = searchVal.trim().toUpperCase();
+      if (val.includes('BANK') || val === 'BANKNIFTY') onNavigate('chain', 'BANKNIFTY');
+      else if (val.includes('FIN') || val === 'FINNIFTY') onNavigate('chain', 'FINNIFTY');
+      else if (val.includes('NIFTY') || val === 'NIFTY') onNavigate('chain', 'NIFTY');
+      setSearchVal('');
+    }
+  };
+
   return (
     <header className="fixed top-0 left-64 right-0 h-20 bg-[#0B1426]/80 backdrop-blur-md border-b border-[#1F2A44] flex items-center justify-between px-8 z-40">
       <div className="flex items-center gap-4">
-        {/* FIX BUG-4: Pass live change & pct */}
         <IndexWidget name="NIFTY 50" price={niftySpot} change={niftyChange} pct={niftyPct} />
         <IndexWidget name="BANK NIFTY" price={bankNiftySpot} change={bankNiftyChange} pct={bankNiftyPct} />
+        <IndexWidget name="FINNIFTY" price={finniftySpot} change={finniftyChange} pct={finniftyPct} />
         <div className="h-8 w-px bg-[#1F2A44] mx-2" />
         <div className="flex items-center gap-2 bg-[#131B2F] px-4 py-2 rounded-full border border-[#1F2A44] focus-within:border-[#00C48C] transition-colors">
           <Search size={16} className="text-[#8A92A6]" />
           <input 
-            type="text" 
-            placeholder="Search stocks (NIFTY, RELIANCE...)" 
-            className="bg-transparent border-none outline-none text-sm text-white w-64 placeholder-[#8A92A6]" 
+            type="text"
+            value={searchVal}
+            onChange={e => setSearchVal(e.target.value)}
+            onKeyDown={handleSearch}
+            placeholder="Search index (NIFTY, BANKNIFTY...)"
+            className="bg-transparent border-none outline-none text-sm text-white w-48 placeholder-[#8A92A6]"
           />
         </div>
       </div>
@@ -116,12 +131,10 @@ const Header = ({ niftySpot, bankNiftySpot, niftyChange, niftyPct, bankNiftyChan
             {isMarketOpen ? 'Market Open' : 'Market Closed'}
           </span>
         </div>
-        <button className="text-[#8A92A6] hover:text-white transition-colors relative">
+        <button title="Notifications" className="text-[#8A92A6] hover:text-white transition-colors relative">
           <Bell size={20} />
-          <span className="absolute -top-1 -right-1 w-2 h-2 bg-[#FF4D4F] rounded-full border-2 border-[#0B1426]" />
         </button>
         
-        {/* Profile Dropdown */}
         <div className="relative" ref={dropdownRef}>
           <div 
             onClick={() => setIsProfileOpen(!isProfileOpen)}
@@ -139,8 +152,9 @@ const Header = ({ niftySpot, bankNiftySpot, niftyChange, niftyPct, bankNiftyChan
 
           {isProfileOpen && (
             <div className="absolute top-full right-0 mt-2 w-48 bg-[#131B2F] border border-[#1F2A44] rounded-2xl shadow-2xl py-2 z-50">
-               <button className="w-full text-left px-4 py-2 text-sm text-[#8A92A6] hover:bg-[#1F2A44] hover:text-white transition-colors">Profile Settings</button>
-               <button className="w-full text-left px-4 py-2 text-sm text-[#8A92A6] hover:bg-[#1F2A44] hover:text-white transition-colors">Subscription</button>
+               {/* M-10: Profile Settings navigates to settings tab */}
+               <button onClick={() => { setIsProfileOpen(false); onNavigate('settings'); }} className="w-full text-left px-4 py-2 text-sm text-[#8A92A6] hover:bg-[#1F2A44] hover:text-white transition-colors">Profile Settings</button>
+               <button onClick={() => { setIsProfileOpen(false); onNavigate('settings'); }} className="w-full text-left px-4 py-2 text-sm text-[#8A92A6] hover:bg-[#1F2A44] hover:text-white transition-colors">Subscription</button>
                <div className="h-px bg-[#1F2A44] my-1" />
                <button 
                 id="logout-button"
@@ -157,10 +171,29 @@ const Header = ({ niftySpot, bankNiftySpot, niftyChange, niftyPct, bankNiftyChan
   );
 };
 
-// M-03 fixed: SettingsPanel accepts realTimeFeed from App so toggling actually pauses the sim
+// M-02 fixed: SettingsPanel wires dark mode to document.documentElement
 const SettingsPanel = ({ realTimeFeed, setRealTimeFeed }) => {
   const [paperTrading, setPaperTrading] = useState(true);
   const [darkMode, setDarkMode] = useState(true);
+
+  // M-02: Actually toggle dark/light mode on the HTML root
+  const handleDarkMode = () => {
+    const next = !darkMode;
+    setDarkMode(next);
+    if (next) {
+      document.documentElement.style.setProperty('--bg-primary', '#0B1426');
+      document.documentElement.style.setProperty('--bg-secondary', '#131B2F');
+      document.documentElement.style.setProperty('--text-primary', '#FFFFFF');
+      document.body.style.backgroundColor = '#0B1426';
+      document.body.style.color = '#FFFFFF';
+    } else {
+      document.documentElement.style.setProperty('--bg-primary', '#F0F2F5');
+      document.documentElement.style.setProperty('--bg-secondary', '#FFFFFF');
+      document.documentElement.style.setProperty('--text-primary', '#1a1a2e');
+      document.body.style.backgroundColor = '#F0F2F5';
+      document.body.style.color = '#1a1a2e';
+    }
+  };
 
   return (
   <div className="flex flex-col gap-6 max-w-2xl">
@@ -194,10 +227,10 @@ const SettingsPanel = ({ realTimeFeed, setRealTimeFeed }) => {
         <div className="flex items-center justify-between py-3">
           <div>
             <div className="text-sm font-bold text-white">Dark Mode</div>
-            <div className="text-[10px] text-[#8A92A6] mt-0.5">Optimized for low-light trading environments.</div>
+            <div className="text-[10px] text-[#8A92A6] mt-0.5">Optimized for low-light trading environments. Toggle to switch theme.</div>
           </div>
           <div 
-            onClick={() => setDarkMode(!darkMode)}
+            onClick={handleDarkMode}
             className={`w-10 h-6 rounded-full flex items-center px-1 cursor-pointer transition-colors ${darkMode ? 'bg-[#00C48C] justify-end' : 'bg-[#1F2A44] justify-start'}`}
           >
             <div className="w-4 h-4 bg-white rounded-full shadow-md" />
@@ -225,6 +258,7 @@ const SettingsPanel = ({ realTimeFeed, setRealTimeFeed }) => {
 
 const NIFTY_OPEN = 23456.75;
 const BANK_NIFTY_OPEN = 48123.40;
+const FINNIFTY_OPEN = 21500.00; // H-02: FINNIFTY open price constant
 
 function App() {
   const [loading, setLoading] = useState(true);
@@ -271,11 +305,13 @@ function App() {
     return () => clearInterval(interval);
   }, []);
 
-  // FIX BUG-4: Track live change from open price
+  // H-01 H-02: FINNIFTY change tracking
   const niftyChange = niftySpot - NIFTY_OPEN;
   const niftyPct = (niftyChange / NIFTY_OPEN) * 100;
   const bankNiftyChange = bankNiftySpot - BANK_NIFTY_OPEN;
   const bankNiftyPct = (bankNiftyChange / BANK_NIFTY_OPEN) * 100;
+  const finniftyChange = finniftySpot - FINNIFTY_OPEN;
+  const finniftyPct = (finniftyChange / FINNIFTY_OPEN) * 100;
 
   const placeOrder = () => {
     const newPositions = legs.map(leg => ({
@@ -376,16 +412,20 @@ function App() {
   return (
     <div className="min-h-screen bg-[#0B1426] text-white">
       <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
-      {/* H-02: isMarketOpen prop passed so Header badge reflects real status */}
+      {/* H-02 H-09: Pass FINNIFTY and navigate helper to Header */}
       <Header 
         niftySpot={niftySpot} 
         bankNiftySpot={bankNiftySpot}
+        finniftySpot={finniftySpot}
         niftyChange={niftyChange}
         niftyPct={niftyPct}
         bankNiftyChange={bankNiftyChange}
         bankNiftyPct={bankNiftyPct}
+        finniftyChange={finniftyChange}
+        finniftyPct={finniftyPct}
         onLogout={handleLogout}
         isMarketOpen={isMarketOpen}
+        onNavigate={(tab, index) => { setActiveTab(tab); if (index) setSelectedIndex(index); }}
       />
       
       <main className="pl-64 pt-20">

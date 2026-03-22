@@ -65,8 +65,17 @@ export const calculateGreeks = (S, K, T, r, sigma, type = 'CE') => {
 };
 
 export const generateOptionChain = (spot, step = 50, range = 20) => {
-  // H-07: Compute DTE from real expiry date instead of hardcoded 7
-  const EXPIRY_DATE = new Date('2026-03-27T15:30:00+05:30');
+  // H-06: Dynamically find the next weekly expiry (Thursday for NIFTY)
+  const getNextExpiry = () => {
+    const now = new Date();
+    const day = now.getDay(); // 0=Sun, 4=Thu
+    const daysToThursday = (4 - day + 7) % 7 || 7; // days until next Thursday (never 0)
+    const expiry = new Date(now);
+    expiry.setDate(now.getDate() + daysToThursday);
+    expiry.setHours(15, 30, 0, 0); // 3:30 PM IST
+    return expiry;
+  };
+  const EXPIRY_DATE = getNextExpiry();
   const now = new Date();
   const dte = Math.max(0.5, (EXPIRY_DATE - now) / (1000 * 60 * 60 * 24));
   const T = dte / 365;

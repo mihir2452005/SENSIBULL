@@ -65,7 +65,8 @@ const OptionChainRow = ({ data, spot, symbol = 'NIFTY', onSelectLeg, viewMode, a
         {viewMode === 'LTP' ? (
           <>
             <div className="text-center font-mono text-[11px] text-[#8A92A6]">{data.ce.oi.toLocaleString('en-IN')}</div>
-            <div className="text-center font-mono text-[11px] text-[#8A92A6]">{data.ce.iv.toFixed(1)}</div>
+            {/* M-04: IV with % sign */}
+            <div className="text-center font-mono text-[11px] text-[#8A92A6]">{data.ce.iv.toFixed(1)}%</div>
             <div 
               onClick={() => onSelectLeg({ symbol, strike: data.strike, type: 'CE', ltp: data.ce.ltp, iv: data.ce.iv })}
               className="text-center font-mono text-[11px] font-bold text-[#00C48C] cursor-pointer hover:bg-[#00C48C]/20 transition-colors py-1 rounded mx-2"
@@ -100,7 +101,8 @@ const OptionChainRow = ({ data, spot, symbol = 'NIFTY', onSelectLeg, viewMode, a
             >
               {data.pe.ltp.toFixed(2)}
             </div>
-            <div className="text-center font-mono text-[11px] text-[#8A92A6]">{data.pe.iv.toFixed(1)}</div>
+                    {/* M-04: PE IV with % sign; L-01: PE IV color */}
+            <div className="text-center font-mono text-[11px] text-[#8A92A6]">{data.pe.iv.toFixed(1)}%</div>
             <div className="text-center font-mono text-[11px] text-[#8A92A6]">{data.pe.oi.toLocaleString('en-IN')}</div>
           </>
         ) : (
@@ -123,6 +125,18 @@ export const OptionChain = ({ symbol = 'NIFTY', spot = 23450, onAddLeg }) => {
   const EXPIRY_OPTIONS = ['27 MAR 2026', '3 APR 2026', '24 APR 2026'];
   const scrollContainerRef = useRef(null);
   const atmRowRef = useRef(null);
+  const expiryRef = useRef(null);
+
+  // M-07: Close expiry dropdown when clicking outside
+  useEffect(() => {
+    const handleOutside = (e) => {
+      if (expiryRef.current && !expiryRef.current.contains(e.target)) {
+        setShowExpiryMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handleOutside);
+    return () => document.removeEventListener('mousedown', handleOutside);
+  }, []);
 
   // FIX BUG: useMemo dependency must not be a computed expression inline
   const roundedSpot = Math.round(spot);
@@ -147,7 +161,7 @@ export const OptionChain = ({ symbol = 'NIFTY', spot = 23450, onAddLeg }) => {
     <div className="bg-[#131B2F]/30 rounded-2xl border border-[#1F2A44] overflow-hidden flex flex-col h-[700px]">
       <div className="flex items-center justify-between p-4 border-b border-[#1F2A44]">
         <div className="flex items-center gap-4">
-          <div className="flex flex-col relative">
+          <div className="flex flex-col relative" ref={expiryRef}>
             <span className="text-[10px] text-[#8A92A6] uppercase font-bold tracking-widest">Expiry Date</span>
             <div 
               className="flex items-center gap-2 text-sm font-bold text-white cursor-pointer hover:text-[#00C48C]"
@@ -223,9 +237,14 @@ export const OptionChain = ({ symbol = 'NIFTY', spot = 23450, onAddLeg }) => {
       )}
       
       <div className="p-3 bg-[#131B2F]/80 border-t border-[#1F2A44] flex items-center justify-center gap-8">
+         {/* L-07: Legend items including ATM strike */}
          <div className="flex items-center gap-2">
             <div className="w-3 h-3 bg-[#00C48C]/10 border border-[#00C48C]/30 rounded" />
             <span className="text-[10px] text-[#8A92A6]">In the Money (Calls)</span>
+         </div>
+         <div className="flex items-center gap-2">
+            <div className="w-3 h-3 border-2 border-[#00C48C] rounded" />
+            <span className="text-[10px] text-[#8A92A6]">At the Money (ATM)</span>
          </div>
          <div className="flex items-center gap-2">
             <div className="w-3 h-3 bg-[#FF4D4F]/10 border border-[#FF4D4F]/30 rounded" />

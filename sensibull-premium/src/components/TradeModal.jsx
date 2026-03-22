@@ -83,7 +83,8 @@ export const TradeModal = ({ isOpen, onClose, data, onConfirm }) => {
           <div className="space-y-3">
              <div className="flex justify-between items-center px-1">
                 <label className="text-[10px] font-bold text-[#8A92A6] uppercase tracking-widest">Lots (Qty)</label>
-                <span className="text-[10px] text-[#8A92A6] font-bold uppercase tracking-widest">Total: {totalQty} shares</span>
+                 {/* M-01: 'units' not 'shares' for index options */}
+                 <span className="text-[10px] text-[#8A92A6] font-bold uppercase tracking-widest">Total: {totalQty} units</span>
              </div>
              <div className="flex items-center gap-4">
                 <button 

@@ -227,8 +227,18 @@ export const StrategyBuilder = ({ legs = [], onAddLeg, onDuplicateLeg, onRemoveL
               </div>
             </div>
           </div>
-          <div className="flex-1 w-full bg-[#0B1426]/30 rounded-xl overflow-hidden">
-             <PayoffChart legs={legs} spot={spot} viewMode={payoffView} />
+          <div className="flex-1 w-full bg-[#0B1426]/30 rounded-xl overflow-hidden relative">
+             {legs.length === 0 ? (
+               <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-center px-8">
+                 <div className="w-14 h-14 bg-[#1F2A44] rounded-full flex items-center justify-center mb-2">
+                   <Layers size={28} className="text-[#8A92A6]" />
+                 </div>
+                 <p className="text-sm font-bold text-white">No strategy to display</p>
+                 <p className="text-xs text-[#8A92A6]">Add options legs using the + button above or from the Option Chain. The payoff diagram will appear here.</p>
+               </div>
+             ) : (
+               <PayoffChart legs={legs} spot={spot} viewMode={payoffView} />
+             )}
           </div>
         </div>
       </div>
