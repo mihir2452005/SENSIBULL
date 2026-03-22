@@ -45,7 +45,7 @@ const TableHeader = ({ viewMode }) => (
 );
 
 // FIX BUG: Greeks are memoized per row so Math.random() doesn't re-run on every re-render
-const OptionChainRow = ({ data, spot, onSelectLeg, viewMode, atmRef }) => {
+const OptionChainRow = ({ data, spot, symbol = 'NIFTY', onSelectLeg, viewMode, atmRef }) => {
   const isAtm = Math.abs(data.strike - spot) < 25;
   const isItmCE = data.strike < spot;
   const isItmPE = data.strike > spot;
@@ -67,7 +67,7 @@ const OptionChainRow = ({ data, spot, onSelectLeg, viewMode, atmRef }) => {
             <div className="text-center font-mono text-[11px] text-[#8A92A6]">{data.ce.oi.toLocaleString('en-IN')}</div>
             <div className="text-center font-mono text-[11px] text-[#8A92A6]">{data.ce.iv.toFixed(1)}</div>
             <div 
-              onClick={() => onSelectLeg({ symbol: 'NIFTY', strike: data.strike, type: 'CE', ltp: data.ce.ltp, iv: data.ce.iv })}
+              onClick={() => onSelectLeg({ symbol, strike: data.strike, type: 'CE', ltp: data.ce.ltp, iv: data.ce.iv })}
               className="text-center font-mono text-[11px] font-bold text-[#00C48C] cursor-pointer hover:bg-[#00C48C]/20 transition-colors py-1 rounded mx-2"
             >
               {data.ce.ltp.toFixed(2)}
@@ -95,7 +95,7 @@ const OptionChainRow = ({ data, spot, onSelectLeg, viewMode, atmRef }) => {
         {viewMode === 'LTP' ? (
           <>
             <div 
-              onClick={() => onSelectLeg({ symbol: 'NIFTY', strike: data.strike, type: 'PE', ltp: data.pe.ltp, iv: data.pe.iv })}
+              onClick={() => onSelectLeg({ symbol, strike: data.strike, type: 'PE', ltp: data.pe.ltp, iv: data.pe.iv })}
               className="text-center font-mono text-[11px] font-bold text-[#FF4D4F] cursor-pointer hover:bg-[#FF4D4F]/20 transition-colors py-1 rounded mx-2"
             >
               {data.pe.ltp.toFixed(2)}
@@ -201,7 +201,8 @@ export const OptionChain = ({ symbol = 'NIFTY', spot = 23450, onAddLeg }) => {
           <OptionChainRow 
             key={row.strike} 
             data={row} 
-            spot={spot} 
+            spot={spot}
+            symbol={symbol}
             onSelectLeg={setSelectedLeg}
             viewMode={viewMode}
             atmRef={atmRowRef}

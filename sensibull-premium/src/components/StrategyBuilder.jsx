@@ -23,7 +23,7 @@ const getIV = (leg) => {
   return (15 + Math.abs(leg.strike - 23450) / 500).toFixed(1);
 };
 
-export const StrategyBuilder = ({ legs = [], onAddLeg, onRemoveLeg, onUpdateLeg, onPlaceOrder, spot = 23450 }) => {
+export const StrategyBuilder = ({ legs = [], onAddLeg, onDuplicateLeg, onRemoveLeg, onUpdateLeg, onPlaceOrder, spot = 23450 }) => {
   // M-05: Track whether to show EXPIRY or T+0 payoff
   const [payoffView, setPayoffView] = useState('expiry');
   const { maxProfit, maxLoss, netPremium, probOfProfit } = useMemo(() => {
@@ -83,9 +83,9 @@ export const StrategyBuilder = ({ legs = [], onAddLeg, onRemoveLeg, onUpdateLeg,
     return { maxProfit, maxLoss, netPremium, probOfProfit };
   }, [legs, spot]);
 
-  // FIX BUG: Clone a leg instead of just copying to strategy
+  // Copy leg: add a duplicate WITHOUT navigating to chain
   const handleCopyLeg = (leg) => {
-    onAddLeg({ ...leg });
+    if (onDuplicateLeg) onDuplicateLeg({ ...leg });
   };
 
   return (

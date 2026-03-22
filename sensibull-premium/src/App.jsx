@@ -428,7 +428,8 @@ function App() {
                 legs={legs} 
                 onRemoveLeg={removeLeg} 
                 onUpdateLeg={updateLeg}
-                onAddLeg={() => setActiveTab('chain')} 
+                onAddLeg={() => setActiveTab('chain')}
+                onDuplicateLeg={addLeg}
                 onPlaceOrder={placeOrder}
                 spot={activeSpot}
               />

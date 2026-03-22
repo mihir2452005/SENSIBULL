@@ -41,7 +41,7 @@ export const TradeModal = ({ isOpen, onClose, data, onConfirm }) => {
             <h3 className="text-lg font-bold text-white flex items-center gap-2">
               {data.symbol} {data.strike} {data.type}
             </h3>
-            <span className="text-[10px] text-[#8A92A6] font-bold uppercase tracking-widest">27 MAR 2026 EXPIRY</span>
+            <span className="text-[10px] text-[#8A92A6] font-bold uppercase tracking-widest">{data.expiry || '27 MAR 2026'} EXPIRY</span>
           </div>
           <button onClick={onClose} className="p-2 text-[#8A92A6] hover:text-white transition-colors rounded-lg hover:bg-[#1F2A44]">
             <X size={20} />
@@ -121,7 +121,7 @@ export const TradeModal = ({ isOpen, onClose, data, onConfirm }) => {
              </div>
              <div className="text-right">
                 <div className="text-[9px] text-[#8A92A6] uppercase font-bold tracking-widest mb-0.5">Available</div>
-                <div className="text-[10px] font-bold text-[#00C48C]">₹4,52,380</div>
+                 <div className="text-[10px] font-bold text-[#00C48C]">₹{availableFunds.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</div>
              </div>
           </div>
         </div>

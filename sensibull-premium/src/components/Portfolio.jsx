@@ -102,7 +102,7 @@ export const Portfolio = ({ positions = [], onExitPosition, realizedPnl = 0, exi
            <span className="text-[10px] text-[#8A92A6] uppercase font-bold tracking-widest">Total Active P&L</span>
            <div className="flex items-baseline gap-2 mt-2">
              <span className={`text-2xl font-bold font-mono ${totalPnl >= 0 ? 'text-[#00C48C]' : 'text-[#FF4D4F]'}`}>
-               {totalPnl >= 0 ? '+' : ''}₹{totalPnl.toLocaleString('en-IN')}
+               {totalPnl >= 0 ? '+' : ''}₹{totalPnl.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
              </span>
              <span className="text-xs text-[#8A92A6] font-mono">Realized: ₹{realizedPnl.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</span>
            </div>

@@ -40,9 +40,11 @@ export const PayoffChart = ({ legs = [], spot = 23450, step = 50, viewMode = 'ex
       const val = payload[0].value;
       return (
         <div className="bg-[#131B2F] border border-[#1F2A44] p-3 rounded-lg shadow-2xl">
-          <div className="text-[10px] text-[#8A92A6] uppercase font-bold mb-1">P&L at Expiry</div>
+          <div className="text-[10px] text-[#8A92A6] uppercase font-bold mb-1">
+            {viewMode === 't0' ? 'P&L at T+0 (Today)' : 'P&L at Expiry'}
+          </div>
           <div className={`text-sm font-mono font-bold ${val >= 0 ? 'text-[#00C48C]' : 'text-[#FF4D4F]'}`}>
-            ₹{val.toLocaleString('en-IN')}
+            ₹{val.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </div>
           <div className="text-[10px] text-[#8A92A6] mt-2">Spot: ₹{payload[0].payload.underlying.toFixed(0)}</div>
         </div>
