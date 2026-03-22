@@ -55,9 +55,9 @@ export const StrategyBuilder = ({ legs = [], onAddLeg, onRemoveLeg, onUpdateLeg,
       if (pnl > maxP) maxP = pnl;
       if (pnl < maxL) maxL = pnl;
     }
-    // Still show 'Unlimited' if payoff keeps growing past scan range
-    const pyoffAtEdgeHigh = (() => {
-      const underlying = spot + range * 1.2;
+    // H-04 definitive: Unlimited only if payoff is still meaningfully growing beyond scan range
+    // For a spread: payoff flattens at maxP. For a naked long call: it keeps rising.
+    const evalPnl = (underlying) => {
       let pnl = 0;
       legs.forEach(leg => {
         const intrinsic = leg.type === 'CE' ? Math.max(0, underlying - leg.strike) : Math.max(0, leg.strike - underlying);
@@ -65,12 +65,18 @@ export const StrategyBuilder = ({ legs = [], onAddLeg, onRemoveLeg, onUpdateLeg,
         pnl += unitPnl * leg.qty * 50;
       });
       return pnl;
-    })();
-    const isUnlimitedProfit = pyoffAtEdgeHigh > maxP * 0.95 && maxP > 0;
-    const isUnlimitedLoss = -pyoffAtEdgeHigh > Math.abs(maxL) * 0.95 && maxL < 0;
+    };
+    const far1 = evalPnl(spot + range * 1.2);
+    const far2 = evalPnl(spot + range * 2.5);
+    const farLow1 = evalPnl(spot - range * 1.2);
+    const farLow2 = evalPnl(spot - range * 2.5);
+    // Unlimited profit: payoff at far2 is >10% higher than at far1 AND maxP
+    const isUnlimitedProfit = far2 > far1 * 1.1 && far2 > maxP * 1.05 && maxP > 0;
+    // Unlimited loss: downside payoff at far2 is >10% more negative than far1
+    const isUnlimitedLoss = farLow2 < farLow1 * 1.1 && farLow2 < maxL * 1.05 && maxL < 0;
 
-    const maxProfit = legs.length === 0 ? 'N/A' : isUnlimitedProfit ? 'Unlimited' : maxP;
-    const maxLoss = legs.length === 0 ? 'N/A' : isUnlimitedLoss ? 'Unlimited' : Math.abs(maxL);
+    const maxProfit = legs.length === 0 ? 'N/A' : isUnlimitedProfit ? 'Unlimited' : +maxP.toFixed(0);
+    const maxLoss = legs.length === 0 ? 'N/A' : isUnlimitedLoss ? 'Unlimited' : +Math.abs(maxL).toFixed(0);
     const probOfProfit = legs.length === 0
       ? 0
       : Math.max(20, Math.min(95, 50 + netDelta * 10)).toFixed(1);
