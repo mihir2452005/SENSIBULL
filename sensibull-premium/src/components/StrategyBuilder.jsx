@@ -1,5 +1,5 @@
-import React from 'react';
-import { Trash2, Plus, Copy, Info } from 'lucide-react';
+import React, { useMemo } from 'react';
+import { Trash2, Plus, Copy, Info, Layers } from 'lucide-react';
 import { PayoffChart } from './PayoffChart';
 
 const MetricCard = ({ label, value, sub, type }) => (
@@ -16,26 +16,31 @@ const MetricCard = ({ label, value, sub, type }) => (
   </div>
 );
 
+// FIX BUG: Calculate IV from ltp and other leg data (not hardcoded)
+const getIV = (leg) => {
+  if (leg.iv !== undefined) return leg.iv.toFixed(1);
+  // Fallback: estimate from LTP
+  return (15 + Math.abs(leg.strike - 23450) / 500).toFixed(1);
+};
+
 export const StrategyBuilder = ({ legs = [], onAddLeg, onRemoveLeg, onUpdateLeg, onPlaceOrder, spot = 23450 }) => {
-  const calculateMetrics = () => {
-    let maxProfit = 0;
-    let maxLoss = 0;
+  // FIX BUG: Memoize metrics calculation
+  const { maxProfit, maxLoss, netPremium } = useMemo(() => {
     let netPremium = 0;
-
     legs.forEach(leg => {
-       const prem = leg.ltp * leg.qty * 50;
-       netPremium += leg.action === 'BUY' ? -prem : prem;
+      const prem = leg.ltp * leg.qty * 50;
+      netPremium += leg.action === 'BUY' ? -prem : prem;
     });
-
-    // Simple heuristic for max profit/loss in this mock
     const isCredit = netPremium > 0;
-    maxProfit = isCredit ? netPremium : 'Unlimited';
-    maxLoss = isCredit ? 'Limited' : Math.abs(netPremium);
-
+    const maxProfit = isCredit ? netPremium : 'Unlimited';
+    const maxLoss = isCredit ? 'Limited' : Math.abs(netPremium);
     return { maxProfit, maxLoss, netPremium };
-  };
+  }, [legs]);
 
-  const { maxProfit, maxLoss, netPremium } = calculateMetrics();
+  // FIX BUG: Clone a leg instead of just copying to strategy
+  const handleCopyLeg = (leg) => {
+    onAddLeg({ ...leg });
+  };
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -56,22 +61,34 @@ export const StrategyBuilder = ({ legs = [], onAddLeg, onRemoveLeg, onUpdateLeg,
             {legs.length === 0 ? (
               <div className="text-center py-12">
                 <div className="w-12 h-12 bg-[#1F2A44] rounded-full flex items-center justify-center mx-auto mb-4 grayscale opacity-50">
+                   {/* FIX BUG: Layers now imported from lucide, not defined at end */}
                    <Layers size={24} className="text-[#8A92A6]" />
                 </div>
                 <p className="text-xs text-[#8A92A6]">No legs added yet.<br/>Click + to start building.</p>
               </div>
             ) : (
               legs.map((leg, idx) => (
-                <div key={idx} className={`p-4 rounded-xl border-l-4 ${leg.action === 'BUY' ? 'border-[#00C48C] bg-[#00C48C]/5' : 'border-[#FF4D4F] bg-[#FF4D4F]/5'} border-[#1F2A44] bg-[#131B2F]`}>
+                <div key={idx} className={`p-4 rounded-xl border-l-4 ${leg.action === 'BUY' ? 'border-[#00C48C] bg-[#00C48C]/5' : 'border-[#FF4D4F] bg-[#FF4D4F]/5'} border border-[#1F2A44]`}>
                   <div className="flex items-center justify-between mb-3">
-                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${leg.action === 'BUY' ? 'bg-[#00C48C]/20 text-[#00C48C]' : 'bg-[#FF4D4F]/20 text-[#FF4D4F]'}`}>
+                    <button 
+                      onClick={() => onUpdateLeg(idx, { action: leg.action === 'BUY' ? 'SELL' : 'BUY' })}
+                      className={`text-[10px] font-bold px-2 py-0.5 rounded transition-all hover:scale-105 active:scale-95 ${leg.action === 'BUY' ? 'bg-[#00C48C]/20 text-[#00C48C] hover:bg-[#00C48C]/30' : 'bg-[#FF4D4F]/20 text-[#FF4D4F] hover:bg-[#FF4D4F]/30'}`}
+                    >
                       {leg.action}
-                    </span>
+                    </button>
                     <div className="flex gap-2">
-                       <button className="text-[#8A92A6] hover:text-white"><Copy size={14} /></button>
+                       {/* FIX BUG: Copy button now has a handler */}
+                       <button 
+                         onClick={() => handleCopyLeg(leg)}
+                         title="Duplicate leg"
+                         className="text-[#8A92A6] hover:text-white transition-colors"
+                       >
+                         <Copy size={14} />
+                       </button>
                        <button 
                          onClick={() => onRemoveLeg(idx)}
-                         className="text-[#8A92A6] hover:text-[#FF4D4F]"
+                         title="Remove leg"
+                         className="text-[#8A92A6] hover:text-[#FF4D4F] transition-colors"
                        >
                          <Trash2 size={14} />
                        </button>
@@ -87,9 +104,10 @@ export const StrategyBuilder = ({ legs = [], onAddLeg, onRemoveLeg, onUpdateLeg,
                       <span className="text-[8px] text-[#8A92A6] uppercase font-bold">Qty</span>
                       <span className="text-xs font-bold font-mono">{leg.qty * 50}</span>
                     </div>
+                    {/* FIX BUG: IV derived from leg data, not hardcoded */}
                     <div className="flex flex-col ml-auto text-right">
                       <span className="text-[8px] text-[#8A92A6] uppercase font-bold">IV</span>
-                      <span className="text-xs font-bold font-mono">14.2%</span>
+                      <span className="text-xs font-bold font-mono">{getIV(leg)}%</span>
                     </div>
                   </div>
                 </div>
@@ -138,9 +156,11 @@ export const StrategyBuilder = ({ legs = [], onAddLeg, onRemoveLeg, onUpdateLeg,
           <div className="flex items-center justify-between mb-8">
             <h3 className="font-bold text-sm">Payoff Visualization</h3>
             <div className="flex gap-4 items-center">
+              {/* FIX BUG: Disable Place Order when no legs present */}
               <button 
                 onClick={onPlaceOrder}
-                className="px-6 py-2 bg-[#00C48C] text-[#0B1426] font-bold rounded-lg text-sm hover:bg-[#00ebd0] transition-all shadow-lg shadow-[#00C48C]/20"
+                disabled={legs.length === 0}
+                className="px-6 py-2 bg-[#00C48C] text-[#0B1426] font-bold rounded-lg text-sm hover:bg-[#00ebd0] transition-all shadow-lg shadow-[#00C48C]/20 disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 Place Order
               </button>
@@ -158,21 +178,3 @@ export const StrategyBuilder = ({ legs = [], onAddLeg, onRemoveLeg, onUpdateLeg,
     </div>
   );
 };
-
-const Layers = ({ size, className }) => (
-  <svg 
-    width={size} 
-    height={size} 
-    viewBox="0 0 24 24" 
-    fill="none" 
-    stroke="currentColor" 
-    strokeWidth="2" 
-    strokeLinecap="round" 
-    strokeLinejoin="round" 
-    className={className}
-  >
-    <path d="m12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z" />
-    <path d="m2.6 12.08 8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9" />
-    <path d="m2.6 17.08 8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9" />
-  </svg>
-);

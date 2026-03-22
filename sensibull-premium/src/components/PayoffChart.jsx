@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   AreaChart,
   Area,
@@ -11,37 +11,26 @@ import {
 } from 'recharts';
 
 export const PayoffChart = ({ legs = [], spot = 23450, step = 50 }) => {
-  // Generate data points for the payoff curve
-  const generateData = () => {
-    const data = [];
-    const range = 500; // ±500 points from spot
+  // FIX BUG: Memoize so P&L data only recalculates when legs or spot changes
+  const data = useMemo(() => {
+    const range = 500;
     const points = 50;
-    
-    for (let i = -points; i <= points; i++) {
-       const underlying = spot + (i * range) / points;
-       let pnl = 0;
-       
-       legs.forEach(leg => {
-         const intrinsic = leg.type === 'CE' 
-           ? Math.max(0, underlying - leg.strike) 
-           : Math.max(0, leg.strike - underlying);
-         
-         const unitPnl = leg.action === 'BUY' 
-           ? intrinsic - leg.ltp 
-           : leg.ltp - intrinsic;
-           
-         pnl += unitPnl * leg.qty * 50; // 50 is lot size
-       });
-       
-       data.push({
-         underlying,
-         pnl: Math.round(pnl)
-       });
-    }
-    return data;
-  };
-
-  const data = generateData();
+    return Array.from({ length: points * 2 + 1 }, (_, idx) => {
+      const i = idx - points;
+      const underlying = spot + (i * range) / points;
+      let pnl = 0;
+      legs.forEach(leg => {
+        const intrinsic = leg.type === 'CE'
+          ? Math.max(0, underlying - leg.strike)
+          : Math.max(0, leg.strike - underlying);
+        const unitPnl = leg.action === 'BUY'
+          ? intrinsic - leg.ltp
+          : leg.ltp - intrinsic;
+        pnl += unitPnl * leg.qty * 50;
+      });
+      return { underlying, pnl: Math.round(pnl) };
+    });
+  }, [legs, spot]);
 
   const CustomTooltip = ({ active, payload }) => {
     if (active && payload && payload.length) {

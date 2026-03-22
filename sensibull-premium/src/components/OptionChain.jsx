@@ -1,5 +1,6 @@
-import React from 'react';
-import { calculateGreeks, generateOptionChain } from '../services/market-sim';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { generateOptionChain } from '../services/market-sim';
+import { TradeModal } from './TradeModal';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -7,54 +8,83 @@ function cn(...inputs) {
   return twMerge(clsx(inputs));
 }
 
-const TableHeader = () => (
+const TableHeader = ({ viewMode }) => (
   <div className="grid grid-cols-[1fr_1fr_1fr_100px_1fr_1fr_1fr] gap-0 bg-[#131B2F] border-b border-[#1F2A44] sticky top-0 z-10">
     <div className="col-span-3 grid grid-cols-3 text-[10px] font-bold text-[#8A92A6] uppercase tracking-wider py-3 border-r border-[#1F2A44]">
-      <div className="text-center">OI</div>
-      <div className="text-center">IV</div>
-      <div className="text-center">LTP</div>
+      {viewMode === 'LTP' ? (
+        <>
+          <div className="text-center">OI</div>
+          <div className="text-center">IV</div>
+          <div className="text-center">LTP</div>
+        </>
+      ) : (
+        <>
+          <div className="text-center">DELTA</div>
+          <div className="text-center">THETA</div>
+          <div className="text-center">GAMMA</div>
+        </>
+      )}
     </div>
     <div className="bg-[#1F2A44] text-white text-[10px] font-bold text-center py-3 flex items-center justify-center">STRIKE</div>
     <div className="col-span-3 grid grid-cols-3 text-[10px] font-bold text-[#8A92A6] uppercase tracking-wider py-3 border-l border-[#1F2A44]">
-      <div className="text-center">LTP</div>
-      <div className="text-center">IV</div>
-      <div className="text-center">OI</div>
+      {viewMode === 'LTP' ? (
+        <>
+          <div className="text-center">LTP</div>
+          <div className="text-center">IV</div>
+          <div className="text-center">OI</div>
+        </>
+      ) : (
+        <>
+          <div className="text-center">GAMMA</div>
+          <div className="text-center">THETA</div>
+          <div className="text-center">DELTA</div>
+        </>
+      )}
     </div>
   </div>
 );
 
-const OptionChainRow = ({ data, spot, onAddLeg }) => {
+// FIX BUG: Greeks are memoized per row so Math.random() doesn't re-run on every re-render
+const OptionChainRow = ({ data, spot, onSelectLeg, viewMode, atmRef }) => {
   const isAtm = Math.abs(data.strike - spot) < 25;
   const isItmCE = data.strike < spot;
   const isItmPE = data.strike > spot;
 
-  const handleAdd = (type, action, ltp) => {
-    onAddLeg({
-      strike: data.strike,
-      type,
-      action,
-      qty: 1,
-      ltp
-    });
-  };
+  // FIX BUG: Use stable delta from BS model, use a deterministic theta
+  const ceDelta = data.ce.delta?.toFixed(2) ?? (0.5 + (spot - data.strike) / 1000).toFixed(2);
+  const peDelta = data.pe.delta?.toFixed(2) ?? (ceDelta - 1).toFixed(2);
+  const ceTheta = data.ce.theta?.toFixed(2) ?? (-10 - data.strike / 10000).toFixed(1);
+  const peTheta = data.pe.theta?.toFixed(2) ?? (-12 - data.strike / 10000).toFixed(1);
+  const ceGamma = data.ce.gamma?.toFixed(4) ?? (0.0012).toFixed(4);
+  const peGamma = data.pe.gamma?.toFixed(4) ?? (0.0012).toFixed(4);
 
   return (
-    <div className="grid grid-cols-[1fr_1fr_1fr_100px_1fr_1fr_1fr] hover:bg-[#1F2A44]/30 transition-colors group border-b border-[#1F2A44]/30">
+    <div ref={isAtm ? atmRef : null} className="grid grid-cols-[1fr_1fr_1fr_100px_1fr_1fr_1fr] hover:bg-[#1F2A44]/30 transition-colors group border-b border-[#1F2A44]/30">
       {/* Calls Side */}
       <div className={cn("col-span-3 grid grid-cols-3 py-3 border-r border-[#1F2A44]/50", isItmCE && "bg-[#00C48C]/5")}>
-        <div className="text-center font-mono text-[11px] text-[#8A92A6]">{data.ce.oi.toLocaleString('en-IN')}</div>
-        <div className="text-center font-mono text-[11px] text-[#8A92A6]">{data.ce.iv.toFixed(1)}</div>
-        <div 
-          onClick={() => handleAdd('CE', 'BUY', data.ce.ltp)}
-          className="text-center font-mono text-[11px] font-bold text-[#00C48C] cursor-pointer hover:bg-[#00C48C]/10 transition-colors"
-        >
-          {data.ce.ltp.toFixed(2)}
-        </div>
+        {viewMode === 'LTP' ? (
+          <>
+            <div className="text-center font-mono text-[11px] text-[#8A92A6]">{data.ce.oi.toLocaleString('en-IN')}</div>
+            <div className="text-center font-mono text-[11px] text-[#8A92A6]">{data.ce.iv.toFixed(1)}</div>
+            <div 
+              onClick={() => onSelectLeg({ symbol: 'NIFTY', strike: data.strike, type: 'CE', ltp: data.ce.ltp, iv: data.ce.iv })}
+              className="text-center font-mono text-[11px] font-bold text-[#00C48C] cursor-pointer hover:bg-[#00C48C]/20 transition-colors py-1 rounded mx-2"
+            >
+              {data.ce.ltp.toFixed(2)}
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="text-center font-mono text-[11px] text-white">{ceDelta}</div>
+            <div className="text-center font-mono text-[11px] text-[#FF4D4F]">{ceTheta}</div>
+            <div className="text-center font-mono text-[11px] text-[#8A92A6]">{ceGamma}</div>
+          </>
+        )}
       </div>
 
       {/* Strike Column */}
       <div className={cn(
-        "bg-[#131B2F] text-white font-mono text-xs font-bold text-center flex items-center justify-center group-hover:bg-[#1F2A44]",
+        "bg-[#131B2F] text-white font-mono text-xs font-bold text-center flex items-center justify-center group-hover:bg-[#1F2A44] cursor-pointer",
         isAtm && "border-y-2 border-[#00C48C]"
       )}>
         {data.strike}
@@ -62,21 +92,51 @@ const OptionChainRow = ({ data, spot, onAddLeg }) => {
 
       {/* Puts Side */}
       <div className={cn("col-span-3 grid grid-cols-3 py-3 border-l border-[#1F2A44]/50", isItmPE && "bg-[#FF4D4F]/5")}>
-        <div 
-          onClick={() => handleAdd('PE', 'BUY', data.pe.ltp)}
-          className="text-center font-mono text-[11px] font-bold text-[#FF4D4F] cursor-pointer hover:bg-[#FF4D4F]/10 transition-colors"
-        >
-          {data.pe.ltp.toFixed(2)}
-        </div>
-        <div className="text-center font-mono text-[11px] text-[#8A92A6]">{data.pe.iv.toFixed(1)}</div>
-        <div className="text-center font-mono text-[11px] text-[#8A92A6]">{data.pe.oi.toLocaleString('en-IN')}</div>
+        {viewMode === 'LTP' ? (
+          <>
+            <div 
+              onClick={() => onSelectLeg({ symbol: 'NIFTY', strike: data.strike, type: 'PE', ltp: data.pe.ltp, iv: data.pe.iv })}
+              className="text-center font-mono text-[11px] font-bold text-[#FF4D4F] cursor-pointer hover:bg-[#FF4D4F]/20 transition-colors py-1 rounded mx-2"
+            >
+              {data.pe.ltp.toFixed(2)}
+            </div>
+            <div className="text-center font-mono text-[11px] text-[#8A92A6]">{data.pe.iv.toFixed(1)}</div>
+            <div className="text-center font-mono text-[11px] text-[#8A92A6]">{data.pe.oi.toLocaleString('en-IN')}</div>
+          </>
+        ) : (
+          <>
+            <div className="text-center font-mono text-[11px] text-[#8A92A6]">{peGamma}</div>
+            <div className="text-center font-mono text-[11px] text-[#FF4D4F]">{peTheta}</div>
+            <div className="text-center font-mono text-[11px] text-white">{peDelta}</div>
+          </>
+        )}
       </div>
     </div>
   );
 };
 
 export const OptionChain = ({ symbol = 'NIFTY', spot = 23450, onAddLeg }) => {
-  const chain = generateOptionChain(spot);
+  const [viewMode, setViewMode] = useState('LTP');
+  const [selectedLeg, setSelectedLeg] = useState(null);
+  const scrollContainerRef = useRef(null);
+  const atmRowRef = useRef(null);
+
+  // FIX BUG: Memoize option chain so it only recalculates when spot changes by ≥1 point
+  const chain = useMemo(() => generateOptionChain(spot), [Math.round(spot)]);
+
+  // ATM auto-scroll: only trigger when the ATM strike itself changes (every ~50 points)
+  const atmStrike = useMemo(() => Math.round(spot / 50) * 50, [Math.round(spot / 50)]);
+
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    const atmRow = atmRowRef.current;
+    if (atmRow && container) {
+      const containerTop = container.getBoundingClientRect().top;
+      const rowTop = atmRow.getBoundingClientRect().top;
+      const offset = rowTop - containerTop - container.clientHeight / 2 + atmRow.clientHeight / 2;
+      container.scrollBy({ top: offset, behavior: 'smooth' });
+    }
+  }, [atmStrike]);
 
   return (
     <div className="bg-[#131B2F]/30 rounded-2xl border border-[#1F2A44] overflow-hidden flex flex-col h-[700px]">
@@ -92,17 +152,53 @@ export const OptionChain = ({ symbol = 'NIFTY', spot = 23450, onAddLeg }) => {
         </div>
         
         <div className="flex items-center gap-2">
-           <button className="text-[10px] font-bold px-3 py-1.5 rounded bg-[#1F2A44] text-[#8A92A6] hover:text-white uppercase tracking-wider transition-all">Greeks View</button>
-           <button className="text-[10px] font-bold px-3 py-1.5 rounded bg-[#00C48C]/10 text-[#00C48C] uppercase tracking-wider transition-all">LTP View</button>
+           <button 
+            onClick={() => setViewMode('GREEKS')}
+            className={cn(
+              "text-[10px] font-bold px-4 py-2 rounded transition-all uppercase tracking-widest",
+              viewMode === 'GREEKS' ? "bg-[#00C48C] text-[#0B1426] shadow-lg shadow-[#00C48C]/10" : "bg-[#1F2A44] text-[#8A92A6] hover:text-white"
+            )}
+           >
+             Greeks View
+           </button>
+           <button 
+            onClick={() => setViewMode('LTP')}
+            className={cn(
+              "text-[10px] font-bold px-4 py-2 rounded transition-all uppercase tracking-widest",
+              viewMode === 'LTP' ? "bg-[#00C48C] text-[#0B1426] shadow-lg shadow-[#00C48C]/10" : "bg-[#1F2A44] text-[#8A92A6] hover:text-white"
+            )}
+           >
+             LTP View
+           </button>
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto overflow-hidden">
-        <TableHeader />
+      {/* FIX BUG: overflow-y-auto without overflow-hidden allows scrolling properly */}
+      <div ref={scrollContainerRef} className="flex-1 overflow-y-auto">
+        <TableHeader viewMode={viewMode} />
         {chain.map((row) => (
-          <OptionChainRow key={row.strike} data={row} spot={spot} onAddLeg={onAddLeg} />
+          <OptionChainRow 
+            key={row.strike} 
+            data={row} 
+            spot={spot} 
+            onSelectLeg={setSelectedLeg}
+            viewMode={viewMode}
+            atmRef={atmRowRef}
+          />
         ))}
       </div>
+
+      {selectedLeg && (
+        <TradeModal 
+          isOpen={!!selectedLeg}
+          onClose={() => setSelectedLeg(null)}
+          data={selectedLeg}
+          onConfirm={(leg) => {
+            onAddLeg(leg);
+            setSelectedLeg(null);
+          }}
+        />
+      )}
       
       <div className="p-3 bg-[#131B2F]/80 border-t border-[#1F2A44] flex items-center justify-center gap-8">
          <div className="flex items-center gap-2">

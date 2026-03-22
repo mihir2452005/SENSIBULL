@@ -82,14 +82,14 @@ export const generateOptionChain = (spot, step = 50, range = 20, dte = 7) => {
       strike,
       ce: {
         ltp: ce.price,
-        change: (Math.random() - 0.5) * 5,
+        change: +((strike % 73) / 10 - 4).toFixed(2), // deterministic change per strike
         oi: Math.floor(1000000 * Math.exp(-15 * dist)),
         iv: iv,
         ...ce
       },
       pe: {
         ltp: pe.price,
-        change: (Math.random() - 0.5) * 5,
+        change: +((strike % 61) / 10 - 3).toFixed(2), // deterministic change per strike
         oi: Math.floor(1000000 * Math.exp(-15 * dist)),
         iv: iv,
         ...pe
