@@ -77,7 +77,7 @@ const IndexWidget = ({ name, price, change, pct }) => (
   </div>
 );
 
-const Header = ({ niftySpot, bankNiftySpot, niftyChange, niftyPct, bankNiftyChange, bankNiftyPct, onLogout }) => {
+const Header = ({ niftySpot, bankNiftySpot, niftyChange, niftyPct, bankNiftyChange, bankNiftyPct, onLogout, isMarketOpen }) => {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const dropdownRef = useRef(null);
 
@@ -111,8 +111,10 @@ const Header = ({ niftySpot, bankNiftySpot, niftyChange, niftyPct, bankNiftyChan
       
       <div className="flex items-center gap-6">
         <div className="flex items-center gap-2">
-          <div className="w-2 h-2 rounded-full bg-[#00C48C] animate-pulse" />
-          <span className="text-[10px] font-bold text-[#00C48C] uppercase tracking-widest">Market Open</span>
+          <div className={`w-2 h-2 rounded-full ${isMarketOpen ? 'bg-[#00C48C] animate-pulse' : 'bg-[#FF4D4F]'}`} />
+          <span className={`text-[10px] font-bold uppercase tracking-widest ${isMarketOpen ? 'text-[#00C48C]' : 'text-[#FF4D4F]'}`}>
+            {isMarketOpen ? 'Market Open' : 'Market Closed'}
+          </span>
         </div>
         <button className="text-[#8A92A6] hover:text-white transition-colors relative">
           <Bell size={20} />
@@ -229,8 +231,10 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [activeTab, setActiveTab] = useState('chain');
+  const [selectedIndex, setSelectedIndex] = useState('NIFTY');
   const [niftySpot, setNiftySpot] = useState(NIFTY_OPEN);
   const [bankNiftySpot, setBankNiftySpot] = useState(BANK_NIFTY_OPEN);
+  const [finniftySpot, setFinniftySpot] = useState(21500.00);
   const [legs, setLegs] = useState([
     { strike: 23500, type: 'CE', action: 'BUY', qty: 1, ltp: 145.20 },
     { strike: 23600, type: 'CE', action: 'SELL', qty: 1, ltp: 88.40 }
@@ -248,6 +252,18 @@ function App() {
   ]);
   const [realizedPnl, setRealizedPnl] = useState(0);
 
+  // Compute the active spot based on index selection
+  const activeSpot = selectedIndex === 'NIFTY' ? niftySpot : selectedIndex === 'BANKNIFTY' ? bankNiftySpot : finniftySpot;
+
+  // Derive market open/closed from real time (NSE: Mon-Fri 9:15am - 3:30pm IST)
+  const isMarketOpen = (() => {
+    const now = new Date();
+    const day = now.getDay(); // 0=Sun,6=Sat
+    const h = now.getHours(), m = now.getMinutes();
+    const mins = h * 60 + m;
+    return day >= 1 && day <= 5 && mins >= 555 && mins < 930; // 9:15=555, 15:30=930
+  })();
+
   // FIX BUG-4: Track live change from open price
   const niftyChange = niftySpot - NIFTY_OPEN;
   const niftyPct = (niftyChange / NIFTY_OPEN) * 100;
@@ -256,7 +272,7 @@ function App() {
 
   const placeOrder = () => {
     const newPositions = legs.map(leg => ({
-       symbol: 'NIFTY',
+       symbol: selectedIndex,
        strike: leg.strike,
        type: leg.type,
        qty: leg.action === 'BUY' ? leg.qty : -leg.qty,
@@ -269,11 +285,12 @@ function App() {
     setActiveTab('positions');
   };
 
-  // Simulate market movement
+  // Simulate market movement for all 3 indices
   useEffect(() => {
     const interval = setInterval(() => {
       setNiftySpot(prev => +(prev + (Math.random() - 0.5) * 8).toFixed(2));
       setBankNiftySpot(prev => +(prev + (Math.random() - 0.5) * 15).toFixed(2));
+      setFinniftySpot(prev => +(prev + (Math.random() - 0.5) * 6).toFixed(2));
     }, 1000);
     return () => clearInterval(interval);
   }, []);
@@ -331,7 +348,7 @@ function App() {
           <Zap size={32} className="text-[#0B1426] fill-current" />
         </div>
         <div className="w-48 h-1.5 bg-[#1F2A44] rounded-full overflow-hidden">
-          <div className="h-full bg-[#00C48C]" style={{ width: '40%' }} />
+          <div className="h-full bg-[#00C48C] animate-[loading_1.2s_ease-in-out_forwards]" style={{ animation: 'loading 1.2s ease-in-out forwards', width: '0%' }} />
         </div>
         <span className="text-[#8A92A6] text-xs font-mono mt-4 tracking-widest uppercase">Initializing Sensibull Pro...</span>
       </div>
@@ -366,15 +383,16 @@ function App() {
               <div className="flex items-center justify-between mb-8">
                 <div>
                   <h1 className="text-3xl font-bold tracking-tight mb-2">Option Chain</h1>
-                  <p className="text-[#8A92A6]">Live strategy analysis for <span className="text-white font-bold">NIFTY 50</span></p>
+                  <p className="text-[#8A92A6]">Live strategy analysis for <span className="text-white font-bold">{selectedIndex === 'NIFTY' ? 'NIFTY 50' : selectedIndex === 'BANKNIFTY' ? 'BANK NIFTY' : 'FINNIFTY'}</span></p>
                 </div>
                 
                 <div className="flex gap-2 p-1 bg-[#131B2F] border border-[#1F2A44] rounded-xl">
                   {['NIFTY', 'BANKNIFTY', 'FINNIFTY'].map(target => (
                     <button 
                       key={target}
+                      onClick={() => setSelectedIndex(target)}
                       className={`px-6 py-2 font-bold rounded-lg text-sm transition-all ${
-                        target === 'NIFTY' ? 'bg-[#00C48C] text-[#0B1426] shadow-lg shadow-[#00C48C]/10' : 'text-[#8A92A6] hover:text-white'
+                        selectedIndex === target ? 'bg-[#00C48C] text-[#0B1426] shadow-lg shadow-[#00C48C]/10' : 'text-[#8A92A6] hover:text-white'
                       }`}
                     >
                       {target}
@@ -382,8 +400,7 @@ function App() {
                   ))}
                 </div>
               </div>
-              {/* FIX BUG-1: Pass live niftySpot instead of hardcoded value */}
-              <OptionChain symbol="NIFTY" spot={niftySpot} onAddLeg={addLeg} />
+              <OptionChain symbol={selectedIndex} spot={activeSpot} onAddLeg={addLeg} />
             </>
           )}
 

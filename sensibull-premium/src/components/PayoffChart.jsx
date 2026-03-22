@@ -48,6 +48,9 @@ export const PayoffChart = ({ legs = [], spot = 23450, step = 50 }) => {
     return null;
   };
 
+  const hasProfit = data.some(d => d.pnl > 0);
+  const hasLoss = data.some(d => d.pnl < 0);
+
   return (
     <div className="h-full w-full">
       <ResponsiveContainer width="100%" height="100%">
@@ -76,13 +79,14 @@ export const PayoffChart = ({ legs = [], spot = 23450, step = 50 }) => {
           <ReferenceLine y={0} stroke="#1F2A44" strokeWidth={2} />
           <ReferenceLine x={spot} stroke="#f5a623" strokeDasharray="3 3" />
           
+          {/* Profit area — green strokes on profit side */}
           <Area
             type="monotone"
             dataKey="pnl"
-            stroke="#00C48C"
+            stroke={hasLoss && !hasProfit ? '#FF4D4F' : '#00C48C'}
             strokeWidth={3}
             fillOpacity={1}
-            fill="url(#colorProfit)"
+            fill={hasLoss && !hasProfit ? 'url(#colorLoss)' : 'url(#colorProfit)'}
             animationDuration={500}
           />
         </AreaChart>

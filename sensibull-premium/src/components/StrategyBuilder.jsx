@@ -24,18 +24,26 @@ const getIV = (leg) => {
 };
 
 export const StrategyBuilder = ({ legs = [], onAddLeg, onRemoveLeg, onUpdateLeg, onPlaceOrder, spot = 23450 }) => {
-  // FIX BUG: Memoize metrics calculation
-  const { maxProfit, maxLoss, netPremium } = useMemo(() => {
+  const { maxProfit, maxLoss, netPremium, probOfProfit } = useMemo(() => {
     let netPremium = 0;
+    let netDelta = 0;
     legs.forEach(leg => {
       const prem = leg.ltp * leg.qty * 50;
       netPremium += leg.action === 'BUY' ? -prem : prem;
+      // Approximate delta: ATM ≈ 0.5, scale by moneyness
+      const approxDelta = 0.5 + (spot - leg.strike) / (spot * 0.1);
+      const clampedDelta = Math.max(0.05, Math.min(0.95, approxDelta));
+      netDelta += leg.action === 'BUY' ? clampedDelta * leg.qty : -clampedDelta * leg.qty;
     });
     const isCredit = netPremium > 0;
     const maxProfit = isCredit ? netPremium : 'Unlimited';
     const maxLoss = isCredit ? 'Limited' : Math.abs(netPremium);
-    return { maxProfit, maxLoss, netPremium };
-  }, [legs]);
+    // Prob of profit: for credit strategies ~ premium / (premium + maxLoss). For debit, use delta.
+    const probOfProfit = legs.length === 0 
+      ? 0 
+      : Math.max(20, Math.min(95, 50 + netDelta * 10)).toFixed(1);
+    return { maxProfit, maxLoss, netPremium, probOfProfit };
+  }, [legs, spot]);
 
   // FIX BUG: Clone a leg instead of just copying to strategy
   const handleCopyLeg = (leg) => {
@@ -119,7 +127,8 @@ export const StrategyBuilder = ({ legs = [], onAddLeg, onRemoveLeg, onUpdateLeg,
         <div className="bg-[#00C48C]/10 border border-[#00C48C]/20 p-4 rounded-2xl flex gap-3">
           <Info size={20} className="text-[#00C48C] shrink-0" />
           <p className="text-xs text-[#00C48C]/80 leading-relaxed">
-            Market is currently <span className="font-bold underline">Bullish</span>. Consider selling Put Spreads for high-probability income.
+            Market is currently <span className="font-bold underline">{spot > 23500 ? 'Bullish' : spot < 23300 ? 'Bearish' : 'Neutral'}</span>. 
+            {spot > 23500 ? ' Consider buying Call Spreads for upside exposure.' : spot < 23300 ? ' Consider buying Put Spreads for downside protection.' : ' Consider Iron Condors for range-bound income.'}
           </p>
         </div>
       </div>
@@ -147,7 +156,7 @@ export const StrategyBuilder = ({ legs = [], onAddLeg, onRemoveLeg, onUpdateLeg,
           />
           <MetricCard 
             label="Prob. of Profit" 
-            value="64.2%" 
+            value={`${probOfProfit}%`} 
             sub="Statistical estimate"
           />
         </div>

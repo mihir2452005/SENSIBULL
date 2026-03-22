@@ -121,11 +121,13 @@ export const OptionChain = ({ symbol = 'NIFTY', spot = 23450, onAddLeg }) => {
   const scrollContainerRef = useRef(null);
   const atmRowRef = useRef(null);
 
-  // FIX BUG: Memoize option chain so it only recalculates when spot changes by ≥1 point
-  const chain = useMemo(() => generateOptionChain(spot), [Math.round(spot)]);
+  // FIX BUG: useMemo dependency must not be a computed expression inline
+  const roundedSpot = Math.round(spot);
+  const chain = useMemo(() => generateOptionChain(spot), [roundedSpot]);
 
   // ATM auto-scroll: only trigger when the ATM strike itself changes (every ~50 points)
-  const atmStrike = useMemo(() => Math.round(spot / 50) * 50, [Math.round(spot / 50)]);
+  const roundedAtm = Math.round(spot / 50);
+  const atmStrike = useMemo(() => Math.round(spot / 50) * 50, [roundedAtm]);
 
   useEffect(() => {
     const container = scrollContainerRef.current;

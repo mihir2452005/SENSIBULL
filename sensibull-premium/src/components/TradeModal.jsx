@@ -134,4 +134,10 @@ export const TradeModal = ({ isOpen, onClose, data, onConfirm }) => {
               action === 'BUY' ? 'bg-[#00C48C] text-[#0B1426] shadow-[#00C48C]/10 hover:bg-[#00ebd0]' : 'bg-[#FF4D4F] text-white shadow-[#FF4D4F]/10 hover:bg-[#ff6b6d]'
             }`}
           >
-            {action === 'BUY' ? 'ADD TO STRATEGY' : 'ADD SEL
+            {action === 'BUY' ? 'ADD TO STRATEGY' : 'ADD SELL LEG'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};

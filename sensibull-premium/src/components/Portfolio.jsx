@@ -28,7 +28,10 @@ const PositionRow = ({ symbol, strike, type, qty, avgPrice, ltp, pnl, onExit }) 
         </span>
       </div>
     </td>
-    <td className="py-4 text-center font-mono text-xs">{qty > 0 ? qty * 50 : Math.abs(qty) * 50 + ' (Short)'}</td>
+    <td className="py-4 text-center font-mono text-xs">
+      <span>{Math.abs(qty) * 50}</span>
+      {qty < 0 && <span className="ml-1 text-[#FF4D4F] text-[9px] font-bold">(Short)</span>}
+    </td>
     <td className="py-4 text-center font-mono text-xs text-[#8A92A6]">₹{avgPrice.toFixed(2)}</td>
     <td className="py-4 text-center font-mono text-xs">₹{ltp.toFixed(2)}</td>
     <td className="py-4 text-right">
